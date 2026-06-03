@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id           String     @id @default(uuid())
+  slug         String     @unique
+  name         String
+  description  String?
+  color        String     @default("purple")
+  defaultView  String     @default("overview")
+  archived     Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  todos        Todo[]
+  documents    Document[]
+}
+
+model Todo {
+  id         String   @id @default(uuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id])
+  title      String
+  content    String?
+  category   String?
+  priority   String   @default("p2") // p1, p2, p3
+  status     String   @default("todo") // todo, in_progress, done, blocked
+  dueDate    DateTime?
+  remarks    String?
+  createdBy  String   @default("system")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Document {
+  id         String   @id @default(uuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id])
+  name       String
+  docType    String? // functional_spec, tech_spec, etc.
+  filename   String
+  mimeType   String
+  sizeBytes  Int
+  storageKey String
+  version    String?
+  uploadedBy String
+  createdAt  DateTime @default(now())
+}
