@@ -492,3 +492,178 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 .scrollbar-thin::-webkit-scrollbar { width: 4px; }
 .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
 .scrollbar-thin::-webkit-scrollbar-thumb { background: var(--color-border-secondary); border-radius: 2px; }
+
+/* Project delete button (appears on hover) */
+.project-delete-btn {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  cursor: pointer;
+  color: var(--color-text-tertiary);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: all 0.15s;
+}
+.project-delete-btn:hover {
+  background: #FCEBEB;
+  color: #A32D2D;
+  opacity: 1;
+}
+
+/* Document download hint */
+.doc-download-hint {
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.doc-card:hover .doc-download-hint {
+  opacity: 1;
+}
+
+/* Nav item clickable state */
+.nav-item-clickable {
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.nav-item-clickable:hover {
+  background: rgba(83,74,183,0.1);
+  color: #534AB7;
+}
+
+/* API Reference modal */
+.api-modal {
+  width: 560px;
+  max-width: 95vw;
+}
+.api-modal-body {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+/* Skill URL banner */
+.api-skill-banner {
+  background: rgba(83,74,183,0.07);
+  border: 0.5px solid rgba(83,74,183,0.2);
+  border-radius: var(--border-radius-md);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+.api-skill-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #534AB7;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+.api-skill-url-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.api-skill-url {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #534AB7;
+  background: rgba(83,74,183,0.1);
+  padding: 4px 8px;
+  border-radius: 4px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.api-skill-hint {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+
+/* Base URL row */
+.api-base-url {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: rgba(0,0,0,0.04);
+  border-radius: var(--border-radius-md);
+  padding: 6px 10px;
+}
+@media (prefers-color-scheme: dark) {
+  .api-base-url { background: rgba(255,255,255,0.06); }
+}
+.api-base-url code { color: var(--color-text-secondary); flex: 1; }
+
+/* Endpoint list */
+.api-endpoint-list {
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+}
+.api-endpoint-row {
+  display: grid;
+  grid-template-columns: 54px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 7px 12px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.api-endpoint-row:last-child { border-bottom: none; }
+.api-endpoint-row:hover { background: rgba(83,74,183,0.05); }
+.api-method-badge {
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-align: center;
+}
+.api-path {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+.api-desc {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+
+/* Copy button */
+.api-copy-btn {
+  padding: 4px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Code block */
+.api-code-block {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: rgba(0,0,0,0.04);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 12px;
+  overflow-x: auto;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  white-space: pre;
+}
+@media (prefers-color-scheme: dark) {
+  .api-code-block { background: rgba(255,255,255,0.05); }
+}

@@ -2,7 +2,6 @@ import { test, expect } from '@playwright/test';
 
 const API = 'http://localhost:3000/v1';
 
-// Seed a known project for tests
 async function ensureProject(slug: string, name: string) {
   const res = await fetch(`${API}/projects`);
   const projects = await res.json();
@@ -15,16 +14,29 @@ async function ensureProject(slug: string, name: string) {
   }
 }
 
+const TEST_SLUG = 'e2e-test-project';
+const TEST_NAME = 'E2E Test Project';
+
 test.beforeAll(async () => {
-  await ensureProject('e2e-test-project', 'E2E Test Project');
+  await ensureProject(TEST_SLUG, TEST_NAME);
+  // Ensure test project has at least one todo
+  const todosRes = await fetch(`${API}/projects/${TEST_SLUG}/todos`);
+  const todos = await todosRes.json();
+  if (todos.length === 0) {
+    await fetch(`${API}/projects/${TEST_SLUG}/todos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Seed todo', status: 'todo', priority: 'p2', category: 'Backend' }),
+    });
+  }
 });
 
+// ── Overview Tab ──────────────────────────────────────────────────────────
 test.describe('Overview Tab', () => {
   test('shows 4 stat cards', async ({ page }) => {
     await page.goto('/');
     await page.waitForSelector('.stats-row');
-    const cards = page.locator('.stat-card');
-    await expect(cards).toHaveCount(4);
+    await expect(page.locator('.stat-card')).toHaveCount(4);
   });
 
   test('shows Recent Tasks card', async ({ page }) => {
@@ -34,8 +46,7 @@ test.describe('Overview Tab', () => {
 
   test('shows Documents card', async ({ page }) => {
     await page.goto('/');
-    const cards = page.locator('.glass-card');
-    await expect(cards.nth(1)).toContainText('Documents');
+    await expect(page.locator('.glass-card').nth(1)).toContainText('Documents');
   });
 
   test('shows API hint bar', async ({ page }) => {
@@ -50,6 +61,7 @@ test.describe('Overview Tab', () => {
   });
 });
 
+// ── Project Management ────────────────────────────────────────────────────
 test.describe('Project Management', () => {
   test('sidebar shows projects list', async ({ page }) => {
     await page.goto('/');
@@ -68,10 +80,11 @@ test.describe('Project Management', () => {
     await page.locator('.new-project-btn').click();
     await page.locator('input[name="name"]').fill('E2E Created Project');
     await page.locator('.modal-footer .btn-primary').click();
-    await expect(page.locator(".project-item", { hasText: "E2E Created Project" })).toBeVisible();
+    await expect(page.locator('.project-item', { hasText: 'E2E Created Project' })).toBeVisible();
   });
 });
 
+// ── Task Management ───────────────────────────────────────────────────────
 test.describe('Task Management', () => {
   test('can open New Task modal', async ({ page }) => {
     await page.goto('/');
@@ -104,34 +117,41 @@ test.describe('Task Management', () => {
     await expect(page.locator('.glass-card')).toContainText('E2E Test Task');
   });
 
-  test('can toggle task completion via UI click', async ({ page }) => {
+  test('can toggle task completion via checkbox', async ({ page }) => {
+    const createRes = await page.request.post(`${API}/projects/${TEST_SLUG}/todos`, {
+      headers: { 'Content-Type': 'application/json' },
+      data: { title: `TGL-${Date.now()}`, status: 'todo', priority: 'p2', category: 'Backend' },
+    });
+    const todo = await createRes.json();
+
     await page.goto('/');
-    const uniqueTitle = `Toggle-${Date.now()}`;
-
-    // Create a task via UI
-    await page.locator('.btn-primary', { hasText: 'New task' }).click();
-    await page.locator('input[name="title"]').fill(uniqueTitle);
-    await page.locator('.modal-footer .btn-primary').click();
-    await page.waitForTimeout(600);
-
-    // Switch to todo tab and wait for the row
+    await page.locator('.project-item', { hasText: TEST_NAME }).click();
     await page.locator('#tab-todo').click();
     await page.waitForSelector('.todo-table-header');
-    const row = page.locator('.todo-full-row').filter({ hasText: uniqueTitle });
-    await expect(row.locator('.status-pill')).toHaveClass(/st-todo/);
+    const row = page.locator('.todo-full-row').filter({ hasText: todo.title });
+    await expect(row).toBeVisible();
 
-    // Click to toggle — now with fixed optimistic update (no unconditional refetch)
-    await row.click();
-    await expect(row.locator('.status-pill')).toHaveClass(/st-done/);
+    const patchPromise = page.waitForResponse(
+      r => r.url().includes('/v1/todos/') && r.request().method() === 'PATCH',
+      { timeout: 5000 }
+    );
+    await row.locator('.todo-check').click();
+    const patchRes = await patchPromise;
+    expect(patchRes.ok()).toBeTruthy();
+    const patched = await patchRes.json();
+    expect(patched.status).toBe('done');
+
+    await page.request.delete(`${API}/todos/${todo.id}`);
   });
 });
 
+// ── Todo View Filters ─────────────────────────────────────────────────────
 test.describe('Todo View Filters', () => {
   test('filter chips are visible', async ({ page }) => {
     await page.goto('/');
     await page.locator('#tab-todo').click();
     const chips = page.locator('.filter-chip');
-    await expect(chips).toHaveCount(7); // All + 4 statuses + Filter + Sort
+    await expect(chips).toHaveCount(7);
   });
 
   test('can filter by In Progress', async ({ page }) => {
@@ -151,6 +171,7 @@ test.describe('Todo View Filters', () => {
   });
 });
 
+// ── Documents Tab ─────────────────────────────────────────────────────────
 test.describe('Documents Tab', () => {
   test('shows upload zone', async ({ page }) => {
     await page.goto('/');
@@ -161,9 +182,7 @@ test.describe('Documents Tab', () => {
   test('can upload a document', async ({ page }) => {
     await page.goto('/');
     await page.locator('#tab-docs').click();
-    const uploadZone = page.locator('.upload-zone');
-    const fileInput = page.locator('input[type="file"]');
-    await fileInput.setInputFiles({
+    await page.locator('input[type="file"]').setInputFiles({
       name: 'test-e2e-doc.txt',
       mimeType: 'text/plain',
       buffer: Buffer.from('E2E test document content'),
@@ -177,5 +196,123 @@ test.describe('Documents Tab', () => {
     await page.goto('/');
     await page.locator('#tab-docs').click();
     await expect(page.locator('.api-hint')).toContainText('POST /v1/projects');
+  });
+});
+
+// ── Project Deletion ──────────────────────────────────────────────────────
+test.describe('Project Deletion', () => {
+  test('delete button appears on hover over project item', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('.project-item').first().hover();
+    await expect(page.locator('.project-delete-btn').first()).toBeVisible();
+  });
+
+  test('can delete a project via API', async ({ page }) => {
+    const res = await page.request.post(`${API}/projects`, {
+      headers: { 'Content-Type': 'application/json' },
+      data: { name: 'E2E Delete Me', color: '#534AB7' },
+    });
+    const proj = await res.json();
+    expect(proj.slug).toBe('e2e-delete-me');
+
+    const del = await page.request.delete(`${API}/projects/${proj.slug}`);
+    expect((await del.json()).success).toBe(true);
+
+    const list = await page.request.get(`${API}/projects`);
+    const projects = await list.json();
+    expect(projects.find((p: any) => p.slug === 'e2e-delete-me')).toBeUndefined();
+  });
+});
+
+// ── Todo Edit Modal ───────────────────────────────────────────────────────
+test.describe('Todo Edit Modal', () => {
+  test('clicking todo row opens edit modal', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('.project-item', { hasText: TEST_NAME }).click();
+    await page.locator('#tab-todo').click();
+    await page.waitForSelector('.todo-table-header');
+    await page.locator('.todo-full-row').first().click();
+    await expect(page.locator('.modal')).toBeVisible();
+    await expect(page.locator('.modal-header')).toContainText('Edit task');
+  });
+
+  test('edit modal shows all fields', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('.project-item', { hasText: TEST_NAME }).click();
+    await page.locator('#tab-todo').click();
+    await page.waitForSelector('.todo-full-row');
+    await page.locator('.todo-full-row').first().click();
+    const modal = page.locator('.modal');
+    await expect(modal.locator('input[value]').first()).toBeVisible();
+    await expect(modal.locator('textarea')).toBeVisible();
+    await expect(modal.locator('select').first()).toBeVisible();
+  });
+
+  test('can edit and save a todo', async ({ page }) => {
+    const res = await page.request.post(`${API}/projects/${TEST_SLUG}/todos`, {
+      headers: { 'Content-Type': 'application/json' },
+      data: { title: `EDIT-${Date.now()}`, status: 'todo', priority: 'p2', category: 'Backend' },
+    });
+    const todo = await res.json();
+
+    await page.goto('/');
+    await page.locator('.project-item', { hasText: TEST_NAME }).click();
+    await page.locator('#tab-todo').click();
+    await page.waitForSelector('.todo-full-row');
+
+    await page.locator('.todo-full-row').filter({ hasText: todo.title }).click();
+    await expect(page.locator('.modal')).toBeVisible();
+
+    // Triple-click to select all text, then type replacement
+    const titleInput = page.locator('.modal').getByRole('textbox').first();
+    await titleInput.click({ clickCount: 3 });
+    await page.keyboard.type('-UPD');
+
+    const patchPromise = page.waitForResponse(
+      r => r.url().includes(`/todos/${todo.id}`) && r.request().method() === 'PATCH',
+      { timeout: 5000 }
+    );
+    await page.locator('.modal-footer .btn-primary').click();
+    const patchRes = await patchPromise;
+    expect(patchRes.ok()).toBeTruthy();
+
+    await page.request.delete(`${API}/todos/${todo.id}`);
+  });
+
+  test('checkbox click toggles done without opening modal', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('.project-item', { hasText: TEST_NAME }).click();
+    await page.locator('#tab-todo').click();
+    await page.waitForSelector('.todo-full-row');
+    const row = page.locator('.todo-full-row').first();
+    await row.locator('.todo-check').click();
+    await expect(page.locator('.modal')).not.toBeVisible();
+  });
+});
+
+// ── Document Download ─────────────────────────────────────────────────────
+test.describe('Document Download', () => {
+  test('doc card shows download hint on hover', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#tab-docs').click();
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'dl-hint-test.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('download hint test'),
+    });
+    await page.waitForTimeout(1000);
+    const card = page.locator('.doc-card').filter({ hasText: 'dl-hint-test' }).first();
+    await card.hover();
+    await expect(card.locator('.doc-download-hint')).toBeVisible();
+  });
+
+  test('doc download URL is correct', async ({ page }) => {
+    const docsRes = await page.request.get(`${API}/projects/${TEST_SLUG}/documents`);
+    const docs = await docsRes.json();
+    if (docs.length > 0) {
+      const doc = docs[0];
+      const downloadRes = await page.request.get(`http://localhost:3000/uploads/${doc.storageKey}`);
+      expect(downloadRes.ok()).toBeTruthy();
+    }
   });
 });

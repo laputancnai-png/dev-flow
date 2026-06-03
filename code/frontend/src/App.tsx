@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Folder, Settings, Terminal, UserCircle,
-  Plus, Folders, FileText, SquareCheck, X, Check,
+  Plus, Folders, FileText, SquareCheck, X, Check, Trash2,
+  Copy, ExternalLink,
 } from 'lucide-react';
 import './App.css';
-import { api } from './api';
+import { api, API_BASE } from './api';
 import type { Project, Todo, Doc } from './types';
 import OverviewView from './views/OverviewView';
 import TodoView from './views/TodoView';
@@ -12,6 +13,132 @@ import DocumentsView from './views/DocumentsView';
 
 type Tab = 'overview' | 'docs' | 'todo';
 
+const BACKEND_ROOT = API_BASE.replace('/v1', '');
+const SKILL_URL = `${BACKEND_ROOT}/agent-skill`;
+
+// ── API Reference modal ───────────────────────────────────────────────────
+function ApiReferenceModal({ onClose }: { onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  const endpoints = [
+    { method: 'GET', path: '/v1/projects', desc: '列出所有项目' },
+    { method: 'POST', path: '/v1/projects', desc: '创建项目' },
+    { method: 'DELETE', path: '/v1/projects/:slug', desc: '删除项目（级联）' },
+    { method: 'GET', path: '/v1/projects/:slug/todos', desc: '列出任务' },
+    { method: 'POST', path: '/v1/projects/:slug/todos', desc: '创建任务' },
+    { method: 'PATCH', path: '/v1/todos/:id', desc: '更新任务字段' },
+    { method: 'DELETE', path: '/v1/todos/:id', desc: '删除任务' },
+    { method: 'GET', path: '/v1/projects/:slug/documents', desc: '列出文档' },
+    { method: 'POST', path: '/v1/projects/:slug/documents', desc: '上传文档（multipart）' },
+    { method: 'DELETE', path: '/v1/documents/:id', desc: '删除文档' },
+    { method: 'GET', path: '/uploads/:storageKey', desc: '下载文档文件' },
+  ];
+
+  const methodColor: Record<string, string> = {
+    GET: '#1D9E75', POST: '#534AB7', PATCH: '#BA7517', DELETE: '#A32D2D',
+  };
+
+  return (
+    <div className="modal-overlay open" onClick={onClose}>
+      <div className="modal api-modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Terminal size={16} style={{ color: '#534AB7' }} /> API / Agent 参考
+          </span>
+          <X size={18} style={{ cursor: 'pointer', color: 'var(--color-text-tertiary)' }} onClick={onClose} />
+        </div>
+
+        <div className="modal-body api-modal-body">
+          {/* Skill URL */}
+          <div className="api-skill-banner">
+            <div className="api-skill-label">Agent Skill 文件 URL</div>
+            <div className="api-skill-url-row">
+              <code className="api-skill-url">{SKILL_URL}</code>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  className="btn-ghost api-copy-btn"
+                  onClick={() => copy(SKILL_URL)}
+                  title="复制 URL"
+                >
+                  {copied ? <Check size={12} /> : <Copy size={12} />}
+                  {copied ? '已复制' : '复制'}
+                </button>
+                <a
+                  href={SKILL_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-ghost api-copy-btn"
+                  style={{ textDecoration: 'none' }}
+                >
+                  <ExternalLink size={12} /> 预览
+                </a>
+              </div>
+            </div>
+            <div className="api-skill-hint">
+              将此 URL 给 AI Agent，它可自行读取完整 API 文档和使用说明
+            </div>
+          </div>
+
+          {/* Base URL */}
+          <div className="form-field" style={{ marginBottom: 12 }}>
+            <div className="form-label">Base URL</div>
+            <div className="api-base-url">
+              <code>{API_BASE}</code>
+              <button className="btn-ghost api-copy-btn" onClick={() => copy(API_BASE)}>
+                <Copy size={11} />
+              </button>
+            </div>
+          </div>
+
+          {/* Endpoint table */}
+          <div className="form-label" style={{ marginBottom: 8 }}>端点速览</div>
+          <div className="api-endpoint-list">
+            {endpoints.map(ep => (
+              <div
+                key={ep.path}
+                className="api-endpoint-row"
+                onClick={() => copy(`${API_BASE}${ep.path}`)}
+                title="点击复制完整 URL"
+              >
+                <span
+                  className="api-method-badge"
+                  style={{ color: methodColor[ep.method] || '#534AB7', background: `${methodColor[ep.method]}18` }}
+                >
+                  {ep.method}
+                </span>
+                <code className="api-path">{ep.path}</code>
+                <span className="api-desc">{ep.desc}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Quick example */}
+          <div className="form-label" style={{ marginTop: 14, marginBottom: 6 }}>Agent 快速示例</div>
+          <pre className="api-code-block">{`# 列出项目
+curl ${API_BASE}/projects
+
+# 创建任务（标记来自 Agent）
+curl -X POST ${API_BASE}/projects/my-project/todos \\
+  -H "Content-Type: application/json" \\
+  -d '{"title":"Review API spec","priority":"p1","createdBy":"agent"}'
+
+# 更新任务状态
+curl -X PATCH ${API_BASE}/todos/:id \\
+  -H "Content-Type: application/json" \\
+  -d '{"status":"done"}'`}</pre>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main App ─────────────────────────────────────────────────────────────
 export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
@@ -21,6 +148,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showProjectModal, setShowProjectModal] = useState(false);
+  const [showApiModal, setShowApiModal] = useState(false);
+  const [hoveredProjectId, setHoveredProjectId] = useState<string | null>(null);
 
   useEffect(() => { fetchProjects(); }, []);
 
@@ -53,9 +182,20 @@ export default function App() {
     const newStatus = todo.status === 'done' ? 'todo' : 'done';
     setTodos(prev => prev.map(t => t.id === todo.id ? { ...t, status: newStatus } : t));
     await api.todos.update(todo.id, { status: newStatus }).catch(() => {
-      // revert optimistic update on failure
       setTodos(prev => prev.map(t => t.id === todo.id ? { ...t, status: todo.status } : t));
     });
+  };
+
+  const handleDeleteProject = async (project: Project) => {
+    if (!window.confirm(`删除项目 "${project.name}" 及其所有任务和文档？`)) return;
+    await api.projects.delete(project.slug).catch(console.error);
+    const remaining = projects.filter(p => p.id !== project.id);
+    setProjects(remaining);
+    if (activeProject?.id === project.id) {
+      setActiveProject(remaining[0] ?? null);
+      setTodos([]);
+      setDocs([]);
+    }
   };
 
   const handleCreateTask = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -121,22 +261,38 @@ export default function App() {
               key={p.id}
               className={`project-item ${activeProject?.id === p.id ? 'active' : ''}`}
               onClick={() => setActiveProject(p)}
+              onMouseEnter={() => setHoveredProjectId(p.id)}
+              onMouseLeave={() => setHoveredProjectId(null)}
             >
               <div className="project-dot" style={{ backgroundColor: p.color }} />
-              <span>{p.name}</span>
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+              {hoveredProjectId === p.id && (
+                <button
+                  className="project-delete-btn"
+                  title="删除项目"
+                  onClick={e => { e.stopPropagation(); handleDeleteProject(p); }}
+                >
+                  <Trash2 size={11} />
+                </button>
+              )}
             </div>
           ))}
-          <button
-            className="new-project-btn"
-            onClick={() => setShowProjectModal(true)}
-          >
+          <button className="new-project-btn" onClick={() => setShowProjectModal(true)}>
             <Plus size={14} /> New Project
           </button>
         </div>
 
         <div className="sidebar-bottom">
-          <div className="nav-item"><Terminal size={15} /> CLI / API</div>
-          <div className="nav-item"><UserCircle size={15} /> Account</div>
+          <div
+            className="nav-item nav-item-clickable"
+            onClick={() => setShowApiModal(true)}
+            title="API 参考 & Agent Skill"
+          >
+            <Terminal size={15} /> CLI / API
+          </div>
+          <div className="nav-item">
+            <UserCircle size={15} /> Account
+          </div>
         </div>
       </nav>
 
@@ -172,12 +328,17 @@ export default function App() {
                   todos={todos}
                   docs={docs}
                   onToggleTodo={toggleTodo}
-                  onViewAll={(tab) => setActiveTab(tab as Tab)}
+                  onViewAll={tab => setActiveTab(tab as Tab)}
                   projectSlug={activeProject.slug}
                 />
               )}
               {activeTab === 'todo' && (
-                <TodoView todos={todos} loading={loading} onToggleTodo={toggleTodo} />
+                <TodoView
+                  todos={todos}
+                  loading={loading}
+                  onToggleTodo={toggleTodo}
+                  onTodosChange={() => fetchTodos(activeProject.slug)}
+                />
               )}
               {activeTab === 'docs' && (
                 <DocumentsView
@@ -195,7 +356,9 @@ export default function App() {
         </section>
       </div>
 
-      {/* New Task Modal */}
+      {/* Modals */}
+      {showApiModal && <ApiReferenceModal onClose={() => setShowApiModal(false)} />}
+
       {showTaskModal && (
         <Modal title="New task" onClose={() => setShowTaskModal(false)}>
           <form onSubmit={handleCreateTask}>
@@ -254,7 +417,6 @@ export default function App() {
         </Modal>
       )}
 
-      {/* New Project Modal */}
       {showProjectModal && (
         <Modal title="New project" onClose={() => setShowProjectModal(false)}>
           <form onSubmit={handleCreateProject}>

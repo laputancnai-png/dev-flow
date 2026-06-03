@@ -18,6 +18,8 @@ export const api = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       }),
+    delete: (slug: string) =>
+      req<{ success: boolean }>(`/projects/${slug}`, { method: "DELETE" }),
   },
   todos: {
     list: (slug: string) => req<Todo[]>(`/projects/${slug}/todos`),
@@ -33,7 +35,8 @@ export const api = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       }),
-    delete: (id: string) => req<{ success: boolean }>(`/todos/${id}`, { method: "DELETE" }),
+    delete: (id: string) =>
+      req<{ success: boolean }>(`/todos/${id}`, { method: "DELETE" }),
   },
   documents: {
     list: (slug: string) => req<Doc[]>(`/projects/${slug}/documents`),
@@ -42,6 +45,9 @@ export const api = {
       form.append("file", file);
       return req<Doc>(`/projects/${slug}/documents`, { method: "POST", body: form });
     },
-    delete: (id: string) => req<{ success: boolean }>(`/documents/${id}`, { method: "DELETE" }),
+    delete: (id: string) =>
+      req<{ success: boolean }>(`/documents/${id}`, { method: "DELETE" }),
+    downloadUrl: (storageKey: string) =>
+      `http://localhost:3000/uploads/${storageKey}`,
   },
 };

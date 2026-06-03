@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { FileText, FileCode, FileSpreadsheet, Image, CloudUpload, X, Terminal } from "lucide-react";
+import { FileText, FileCode, FileSpreadsheet, Image, CloudUpload, X, Terminal, Download } from "lucide-react";
 import type { Doc } from "../types";
 import { api } from "../api";
 
@@ -46,6 +46,16 @@ function mimeLabel(mimeType: string, filename: string) {
   return ext || mimeType.split("/")[1]?.toUpperCase() || "FILE";
 }
 
+function handleDownload(doc: Doc) {
+  const url = api.documents.downloadUrl(doc.storageKey);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = doc.filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 export default function DocumentsView({ docs, projectSlug, onRefresh }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -62,6 +72,7 @@ export default function DocumentsView({ docs, projectSlug, onRefresh }: Props) {
   };
 
   const handleDelete = async (id: string) => {
+    if (!window.confirm("Delete this document?")) return;
     await api.documents.delete(id).catch(console.error);
     onRefresh();
   };
@@ -70,8 +81,13 @@ export default function DocumentsView({ docs, projectSlug, onRefresh }: Props) {
     <div>
       {docs.length > 0 && (
         <div className="docs-grid">
-          {docs.map((doc) => (
-            <div key={doc.id} className="doc-card">
+          {docs.map(doc => (
+            <div
+              key={doc.id}
+              className="doc-card"
+              onClick={() => handleDownload(doc)}
+              title={`Click to download ${doc.filename}`}
+            >
               <div className="doc-card-inner">
                 <div className="doc-icon" style={{ background: DocIconBg(doc.mimeType) as string }}>
                   <DocIcon mimeType={doc.mimeType} />
@@ -80,11 +96,14 @@ export default function DocumentsView({ docs, projectSlug, onRefresh }: Props) {
                 <div className="doc-meta">
                   {mimeLabel(doc.mimeType, doc.filename)} · {formatSize(doc.sizeBytes)} · {timeAgo(doc.createdAt)}
                 </div>
+                <div className="doc-download-hint">
+                  <Download size={11} /> Click to download
+                </div>
               </div>
               <button
                 className="doc-delete-btn"
                 title="Delete"
-                onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }}
+                onClick={e => { e.stopPropagation(); handleDelete(doc.id); }}
               >
                 <X size={12} />
               </button>
@@ -96,9 +115,9 @@ export default function DocumentsView({ docs, projectSlug, onRefresh }: Props) {
       <div
         className={`upload-zone ${dragOver ? "drag-over" : ""} ${uploading ? "uploading" : ""}`}
         onClick={() => inputRef.current?.click()}
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragOver={e => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+        onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
       >
         <CloudUpload size={28} style={{ marginBottom: "8px", display: "block" }} />
         {uploading ? "Uploading..." : "Drop files here or click to upload"}
@@ -110,7 +129,7 @@ export default function DocumentsView({ docs, projectSlug, onRefresh }: Props) {
           type="file"
           multiple
           style={{ display: "none" }}
-          onChange={(e) => handleFiles(e.target.files)}
+          onChange={e => handleFiles(e.target.files)}
         />
       </div>
 
