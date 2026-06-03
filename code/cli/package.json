@@ -1,0 +1,25 @@
+{
+  "name": "devflow-cli",
+  "version": "0.1.0",
+  "description": "DevFlow CLI — manage projects, todos, and documents from the terminal",
+  "type": "module",
+  "bin": {
+    "devflow": "./bin/devflow.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "cli-table3": "^0.6.5",
+    "commander": "^12.1.0",
+    "form-data": "^4.0.5",
+    "mime-types": "^3.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
+  }
+}
