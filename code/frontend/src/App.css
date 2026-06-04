@@ -667,3 +667,96 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 @media (prefers-color-scheme: dark) {
   .api-code-block { background: rgba(255,255,255,0.05); }
 }
+
+/* API modal tab bar */
+.api-tab-bar {
+  display: flex;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  padding: 0 20px;
+  background: rgba(255,255,255,0.1);
+  flex-shrink: 0;
+}
+.api-tab {
+  padding: 9px 16px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -0.5px;
+  transition: all 0.15s;
+  user-select: none;
+}
+.api-tab:hover { color: var(--color-text-primary); }
+.api-tab.active { color: #534AB7; border-bottom-color: #534AB7; font-weight: 500; }
+
+/* Skill cards */
+.skill-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: rgba(83,74,183,0.05);
+  border: 0.5px solid rgba(83,74,183,0.15);
+  border-radius: var(--border-radius-md);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.skill-card-icon { font-size: 22px; flex-shrink: 0; margin-top: 2px; }
+.skill-card-title { font-size: 13px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 3px; }
+.skill-card-desc { font-size: 11px; color: var(--color-text-tertiary); line-height: 1.5; }
+
+/* CLI row (no method badge) */
+.cli-row { grid-template-columns: 1fr auto auto; }
+.cli-cmd { font-size: 11px; color: #534AB7; }
+
+/* Skill doc inline section */
+.skill-doc-section {
+  background: rgba(29,158,117,0.05);
+  border: 0.5px solid rgba(29,158,117,0.2);
+  border-radius: var(--border-radius-md);
+  padding: 10px 14px;
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+.skill-doc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.skill-doc-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1D9E75;
+}
+.skill-doc-hint {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  line-height: 1.5;
+  margin-bottom: 0;
+}
+.skill-doc-preview {
+  margin-top: 10px;
+  max-height: 260px;
+  overflow-y: auto;
+  font-size: 10.5px;
+}
+
+/* Agent note */
+.api-agent-note {
+  background: rgba(83,74,183,0.05);
+  border: 0.5px solid rgba(83,74,183,0.15);
+  border-radius: var(--border-radius-md);
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 14px;
+  line-height: 1.6;
+}
+.api-agent-note code {
+  font-family: var(--font-mono);
+  background: rgba(83,74,183,0.1);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: #534AB7;
+  font-size: 11px;
+}

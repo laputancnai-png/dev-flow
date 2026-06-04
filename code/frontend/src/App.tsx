@@ -14,30 +14,95 @@ import DocumentsView from './views/DocumentsView';
 type Tab = 'overview' | 'docs' | 'todo';
 
 const BACKEND_ROOT = API_BASE.replace('/v1', '');
-const SKILL_URL = `${BACKEND_ROOT}/agent-skill`;
+
 
 // ── API Reference modal ───────────────────────────────────────────────────
 function ApiReferenceModal({ onClose }: { onClose: () => void }) {
-  const [copied, setCopied] = useState(false);
+  const [tab, setTab] = useState<'skills' | 'api' | 'cli'>('skills');
+  const [copied, setCopied] = useState('');
+  const [skillDoc, setSkillDoc] = useState<string | null>(null);
+  const [showDoc, setShowDoc] = useState(false);
+  const [loadingDoc, setLoadingDoc] = useState(false);
 
-  const copy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+  const copy = async (text: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(key);
+      setTimeout(() => setCopied(''), 1500);
+    } catch {
+      /* clipboard write failed silently */
+    }
   };
 
-  const endpoints = [
-    { method: 'GET', path: '/v1/projects', desc: '列出所有项目' },
-    { method: 'POST', path: '/v1/projects', desc: '创建项目' },
-    { method: 'DELETE', path: '/v1/projects/:slug', desc: '删除项目（级联）' },
-    { method: 'GET', path: '/v1/projects/:slug/todos', desc: '列出任务' },
-    { method: 'POST', path: '/v1/projects/:slug/todos', desc: '创建任务' },
-    { method: 'PATCH', path: '/v1/todos/:id', desc: '更新任务字段' },
-    { method: 'DELETE', path: '/v1/todos/:id', desc: '删除任务' },
-    { method: 'GET', path: '/v1/projects/:slug/documents', desc: '列出文档' },
-    { method: 'POST', path: '/v1/projects/:slug/documents', desc: '上传文档（multipart）' },
-    { method: 'DELETE', path: '/v1/documents/:id', desc: '删除文档' },
-    { method: 'GET', path: '/uploads/:storageKey', desc: '下载文档文件' },
+  const fetchSkillDoc = async (): Promise<string> => {
+    const res = await fetch(`${BACKEND_ROOT}/agent-skill`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.text();
+  };
+
+  const fetchAndCopySkillDoc = async () => {
+    setLoadingDoc(true);
+    try {
+      const text = await fetchSkillDoc();
+      setSkillDoc(text);
+      await navigator.clipboard.writeText(text);
+      setCopied('fulldoc');
+      setTimeout(() => setCopied(''), 2000);
+    } catch {
+      setSkillDoc('⚠ 无法加载文档，请确认后端服务已启动。');
+    } finally {
+      setLoadingDoc(false);
+    }
+  };
+
+  const toggleDocPreview = async () => {
+    if (!showDoc && !skillDoc) {
+      setLoadingDoc(true);
+      try {
+        const text = await fetchSkillDoc();
+        setSkillDoc(text);
+      } catch {
+        setSkillDoc('⚠ 无法加载文档，请确认后端服务已启动。');
+      } finally {
+        setLoadingDoc(false);
+      }
+    }
+    setShowDoc(v => !v);
+  };
+
+  const CopyBtn = ({ text, label, id }: { text: string; label: string; id: string }) => (
+    <button className="btn-ghost api-copy-btn" onClick={() => copy(text, id)}>
+      {copied === id ? <Check size={12} /> : <Copy size={12} />}
+      {copied === id ? 'Copied' : label}
+    </button>
+  );
+
+  const apiEndpoints = [
+    { method: 'GET',    path: '/v1/projects',                  desc: 'List projects' },
+    { method: 'POST',   path: '/v1/projects',                  desc: 'Create project' },
+    { method: 'DELETE', path: '/v1/projects/:slug',            desc: 'Delete project (cascade)' },
+    { method: 'GET',    path: '/v1/projects/:slug/todos',      desc: 'List todos' },
+    { method: 'POST',   path: '/v1/projects/:slug/todos',      desc: 'Create todo' },
+    { method: 'PATCH',  path: '/v1/todos/:id',                 desc: 'Update todo (partial)' },
+    { method: 'DELETE', path: '/v1/todos/:id',                 desc: 'Delete todo' },
+    { method: 'GET',    path: '/v1/projects/:slug/documents',  desc: 'List documents' },
+    { method: 'POST',   path: '/v1/projects/:slug/documents',  desc: 'Upload document' },
+    { method: 'DELETE', path: '/v1/documents/:id',             desc: 'Delete document' },
+    { method: 'GET',    path: '/uploads/:storageKey',          desc: 'Download file' },
+  ];
+
+  const cliCommands = [
+    { cmd: 'devflow projects list',                     desc: '列出所有项目' },
+    { cmd: 'devflow projects create <name>',            desc: '创建项目 [--color --description]' },
+    { cmd: 'devflow projects delete <slug> --yes',      desc: '删除项目（级联）' },
+    { cmd: 'devflow todos list <slug>',                 desc: '列出任务 [--status --priority]' },
+    { cmd: 'devflow todos create <slug> <title>',       desc: '创建任务 [--priority --agent ...]' },
+    { cmd: 'devflow todos update <id> --project <s>',   desc: '更新任务字段（部分更新）' },
+    { cmd: 'devflow todos done <id> --project <s>',     desc: '标记完成（快捷方式）' },
+    { cmd: 'devflow todos delete <id> --yes',           desc: '删除任务' },
+    { cmd: 'devflow docs list <slug>',                  desc: '列出文档' },
+    { cmd: 'devflow docs upload <slug> <file>',         desc: '上传文件' },
+    { cmd: 'devflow docs delete <id> --yes',            desc: '删除文档' },
   ];
 
   const methodColor: Record<string, string> = {
@@ -49,94 +114,227 @@ function ApiReferenceModal({ onClose }: { onClose: () => void }) {
       <div className="modal api-modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Terminal size={16} style={{ color: '#534AB7' }} /> API / Agent 参考
+            <Terminal size={16} style={{ color: '#534AB7' }} /> CLI / API
           </span>
           <X size={18} style={{ cursor: 'pointer', color: 'var(--color-text-tertiary)' }} onClick={onClose} />
         </div>
 
+        {/* Tab bar */}
+        <div className="api-tab-bar">
+          <span className={`api-tab ${tab === 'skills' ? 'active' : ''}`} onClick={() => setTab('skills')}>
+            🤖 Agent Skills
+          </span>
+          <span className={`api-tab ${tab === 'api' ? 'active' : ''}`} onClick={() => setTab('api')}>
+            REST API
+          </span>
+          <span className={`api-tab ${tab === 'cli' ? 'active' : ''}`} onClick={() => setTab('cli')}>
+            CLI
+          </span>
+        </div>
+
         <div className="modal-body api-modal-body">
-          {/* Skill URL */}
-          <div className="api-skill-banner">
-            <div className="api-skill-label">Agent Skill 文件 URL</div>
-            <div className="api-skill-url-row">
-              <code className="api-skill-url">{SKILL_URL}</code>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button
-                  className="btn-ghost api-copy-btn"
-                  onClick={() => copy(SKILL_URL)}
-                  title="复制 URL"
-                >
-                  {copied ? <Check size={12} /> : <Copy size={12} />}
-                  {copied ? '已复制' : '复制'}
-                </button>
-                <a
-                  href={SKILL_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn-ghost api-copy-btn"
-                  style={{ textDecoration: 'none' }}
-                >
-                  <ExternalLink size={12} /> 预览
-                </a>
+
+          {/* ── Agent Skills tab ── */}
+          {tab === 'skills' && (
+            <div>
+              <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 14, lineHeight: 1.6 }}>
+                将以下 URL 发给 AI Agent，它读取后即可自主操作 DevFlow 系统（创建项目、管理任务、上传文档）。
+              </p>
+
+              <SkillCard
+                icon="📋"
+                title="完整指南（REST API + CLI）"
+                url={`${BACKEND_ROOT}/agent-skill`}
+                description="包含所有端点、数据模型、CLI 命令和常见工作流。推荐首选。"
+                onCopy={(url, id) => copy(url, id)}
+                copied={copied}
+                id="full"
+              />
+
+              <SkillCard
+                icon="⌨️"
+                title="CLI 专用指南"
+                url={`${BACKEND_ROOT}/cli-skill`}
+                description="只包含 CLI 命令参考和示例，适合偏好命令行操作的 Agent。"
+                onCopy={(url, id) => copy(url, id)}
+                copied={copied}
+                id="cli"
+              />
+
+              {/* Full skill doc copy + inline preview */}
+              <div className="skill-doc-section">
+                <div className="skill-doc-header">
+                  <span className="skill-doc-label">📄 完整 Skill 文档</span>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      className="btn-ghost api-copy-btn"
+                      onClick={fetchAndCopySkillDoc}
+                      disabled={loadingDoc}
+                      title="复制完整 Markdown 文档，粘贴给 AI Agent 即可使用"
+                    >
+                      {copied === 'fulldoc' ? <Check size={12} /> : <Copy size={12} />}
+                      {copied === 'fulldoc' ? '已复制' : loadingDoc ? '加载中…' : '复制全文'}
+                    </button>
+                    <button className="btn-ghost api-copy-btn" onClick={toggleDocPreview}>
+                      {showDoc ? '收起' : '预览'}
+                    </button>
+                  </div>
+                </div>
+                <p className="skill-doc-hint">
+                  将完整文档粘贴给任意 AI Agent（Claude、GPT、Gemini 等），Agent 即可自主操作此系统。
+                </p>
+                {showDoc && (
+                  <pre className="api-code-block skill-doc-preview">
+                    {skillDoc ?? '加载中…'}
+                  </pre>
+                )}
+              </div>
+
+              <div className="api-agent-note">
+                <strong>Agent 使用提示：</strong>
+                <ul style={{ margin: '6px 0 0 16px', lineHeight: 1.8 }}>
+                  <li>创建任务时加 <code>--agent</code>（CLI）或 <code>"createdBy":"agent"</code>（API），便于区分 AI 创建的任务</li>
+                  <li>短 ID 需配合 <code>--project &lt;slug&gt;</code> 使用，或直接用完整 UUID</li>
+                  <li>所有接口无需认证，直接调用即可</li>
+                </ul>
               </div>
             </div>
-            <div className="api-skill-hint">
-              将此 URL 给 AI Agent，它可自行读取完整 API 文档和使用说明
-            </div>
-          </div>
+          )}
 
-          {/* Base URL */}
-          <div className="form-field" style={{ marginBottom: 12 }}>
-            <div className="form-label">Base URL</div>
-            <div className="api-base-url">
-              <code>{API_BASE}</code>
-              <button className="btn-ghost api-copy-btn" onClick={() => copy(API_BASE)}>
-                <Copy size={11} />
-              </button>
-            </div>
-          </div>
-
-          {/* Endpoint table */}
-          <div className="form-label" style={{ marginBottom: 8 }}>端点速览</div>
-          <div className="api-endpoint-list">
-            {endpoints.map(ep => (
-              <div
-                key={ep.path}
-                className="api-endpoint-row"
-                onClick={() => copy(`${API_BASE}${ep.path}`)}
-                title="点击复制完整 URL"
-              >
-                <span
-                  className="api-method-badge"
-                  style={{ color: methodColor[ep.method] || '#534AB7', background: `${methodColor[ep.method]}18` }}
-                >
-                  {ep.method}
-                </span>
-                <code className="api-path">{ep.path}</code>
-                <span className="api-desc">{ep.desc}</span>
+          {/* ── REST API tab ── */}
+          {tab === 'api' && (
+            <div>
+              <div className="form-field" style={{ marginBottom: 12 }}>
+                <div className="form-label">Base URL</div>
+                <div className="api-base-url">
+                  <code>{API_BASE}</code>
+                  <CopyBtn text={API_BASE} label="复制" id="base" />
+                </div>
               </div>
-            ))}
-          </div>
 
-          {/* Quick example */}
-          <div className="form-label" style={{ marginTop: 14, marginBottom: 6 }}>Agent 快速示例</div>
-          <pre className="api-code-block">{`# 列出项目
+              <div className="form-label" style={{ marginBottom: 8 }}>端点速览 — 点击行复制 URL</div>
+              <div className="api-endpoint-list">
+                {apiEndpoints.map(ep => (
+                  <div
+                    key={ep.path}
+                    className="api-endpoint-row"
+                    onClick={() => copy(
+                      ep.path.startsWith('/uploads') ? `${BACKEND_ROOT}${ep.path}` : `${API_BASE}${ep.path}`,
+                      ep.path,
+                    )}
+                    title="点击复制完整 URL"
+                  >
+                    <span className="api-method-badge"
+                      style={{ color: methodColor[ep.method] || '#534AB7', background: `${methodColor[ep.method]}18` }}>
+                      {ep.method}
+                    </span>
+                    <code className="api-path">{ep.path}</code>
+                    <span className="api-desc">{ep.desc}</span>
+                    {copied === ep.path && <Check size={11} style={{ color: '#1D9E75', flexShrink: 0 }} />}
+                  </div>
+                ))}
+              </div>
+
+              <div className="form-label" style={{ marginTop: 14, marginBottom: 6 }}>curl 示例</div>
+              <pre className="api-code-block">{`# 列出项目
 curl ${API_BASE}/projects
 
-# 创建任务（标记来自 Agent）
-curl -X POST ${API_BASE}/projects/my-project/todos \\
-  -H "Content-Type: application/json" \\
-  -d '{"title":"Review API spec","priority":"p1","createdBy":"agent"}'
+# 创建任务（Agent 标记）
+curl -X POST ${API_BASE}/projects/my-project/todos \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Task","priority":"p1","createdBy":"agent"}'
 
-# 更新任务状态
-curl -X PATCH ${API_BASE}/todos/:id \\
-  -H "Content-Type: application/json" \\
-  -d '{"status":"done"}'`}</pre>
+# 更新状态
+curl -X PATCH ${API_BASE}/todos/:id \
+  -H "Content-Type: application/json" \
+  -d '{"status":"done"}'
+
+# 上传文件
+curl -X POST ${API_BASE}/projects/my-project/documents \
+  -F "file=@./spec.pdf"`}</pre>
+            </div>
+          )}
+
+          {/* ── CLI tab ── */}
+          {tab === 'cli' && (
+            <div>
+              <div className="api-skill-banner" style={{ marginBottom: 14 }}>
+                <div className="api-skill-label">Setup</div>
+                <pre className="api-code-block" style={{ marginTop: 6 }}>{`cd code/cli && npm install
+node bin/devflow.js --help`}</pre>
+              </div>
+
+              <div className="form-label" style={{ marginBottom: 8 }}>命令速览</div>
+              <div className="api-endpoint-list">
+                {cliCommands.map(c => (
+                  <div
+                    key={c.cmd}
+                    className="api-endpoint-row cli-row"
+                    onClick={() => copy(c.cmd, c.cmd)}
+                    title="点击复制命令"
+                  >
+                    <code className="api-path cli-cmd">{c.cmd}</code>
+                    <span className="api-desc">{c.desc}</span>
+                    {copied === c.cmd && <Check size={11} style={{ color: '#1D9E75', flexShrink: 0 }} />}
+                  </div>
+                ))}
+              </div>
+
+              <div className="form-label" style={{ marginTop: 14, marginBottom: 6 }}>示例工作流</div>
+              <pre className="api-code-block">{`# 查看所有项目
+devflow projects list
+
+# 创建项目并添加任务
+devflow projects create "Sprint 43" --color "#534AB7"
+devflow todos create sprint-43 "API design" --priority p1 --agent
+devflow todos create sprint-43 "Implement" --priority p1 --agent
+
+# 查看任务 / 按状态过滤
+devflow todos list sprint-43
+devflow todos list sprint-43 --status in_progress
+
+# 更新进度（短 ID + --project）
+devflow todos update <id> --project sprint-43 --status in_progress
+devflow todos done   <id> --project sprint-43
+
+# 上传文档
+devflow docs upload sprint-43 ./spec.md`}</pre>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
+
+function SkillCard({ icon, title, url, description, onCopy, copied, id }: {
+  icon: string; title: string; url: string; description: string;
+  onCopy: (url: string, id: string) => void; copied: string; id: string;
+}) {
+  return (
+    <div className="skill-card">
+      <div className="skill-card-icon">{icon}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="skill-card-title">{title}</div>
+        <div className="skill-card-desc">{description}</div>
+        <div className="api-skill-url-row" style={{ marginTop: 8 }}>
+          <code className="api-skill-url">{url}</code>
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            <button className="btn-ghost api-copy-btn" onClick={() => onCopy(url, id)}>
+              {copied === id ? <Check size={12} /> : <Copy size={12} />}
+              {copied === id ? 'Copied' : '复制'}
+            </button>
+            <a href={url} target="_blank" rel="noreferrer"
+               className="btn-ghost api-copy-btn" style={{ textDecoration: 'none' }}>
+              <ExternalLink size={12} /> 预览
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 // ── Main App ─────────────────────────────────────────────────────────────
 export default function App() {

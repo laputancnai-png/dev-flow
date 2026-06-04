@@ -7,7 +7,7 @@ import { todoRoutes } from "./routes/todos";
 import { documentRoutes } from "./routes/documents";
 import path from "path";
 import { fileURLToPath } from "url";
-import { readFileSync } from "fs";
+import { readFile } from "fs/promises";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -25,11 +25,25 @@ const start = async () => {
       prefix: "/uploads/",
     });
 
-    // Agent skill guide
+    // Agent skill guides
     fastify.get("/agent-skill", async (request, reply) => {
-      const md = readFileSync(path.join(__dirname, "../agent-skill.md"), "utf-8");
-      reply.header("Content-Type", "text/markdown; charset=utf-8");
-      return reply.send(md);
+      try {
+        const md = await readFile(path.join(__dirname, "../agent-skill.md"), "utf-8");
+        reply.header("Content-Type", "text/markdown; charset=utf-8");
+        return reply.send(md);
+      } catch {
+        return reply.code(404).send({ error: "Skill guide not found" });
+      }
+    });
+
+    fastify.get("/cli-skill", async (request, reply) => {
+      try {
+        const cli = await readFile(path.join(__dirname, "../cli-skill.md"), "utf-8");
+        reply.header("Content-Type", "text/markdown; charset=utf-8");
+        return reply.send(cli);
+      } catch {
+        return reply.code(404).send({ error: "Skill guide not found" });
+      }
     });
 
     await fastify.register(projectRoutes, { prefix: "/v1/projects" });

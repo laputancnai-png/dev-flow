@@ -1,26 +1,23 @@
-# DevFlow AI Agent Skill
+# DevFlow Agent Skill
 
-**Base URL:** `http://localhost:3000/v1`
+> Give this URL to any AI agent: `http://localhost:3000/agent-skill`
+> The agent can also read the CLI-specific guide at: `http://localhost:3000/cli-skill`
 
-DevFlow is a developer-centric project management tool. AI agents can manage projects, tasks (todos), and documents via a REST API. All requests and responses use JSON (except file uploads which use multipart/form-data).
+DevFlow is a developer-centric project management tool. Every action available in the web UI is also available via **REST API** and **CLI**. This document covers both interfaces so an agent can choose whichever is most convenient.
 
 ---
 
-## Quick Reference
+## System Overview
 
-| Action | Method | Path |
-|--------|--------|------|
-| List projects | GET | `/v1/projects` |
-| Create project | POST | `/v1/projects` |
-| Delete project | DELETE | `/v1/projects/:slug` |
-| List todos | GET | `/v1/projects/:slug/todos` |
-| Create todo | POST | `/v1/projects/:slug/todos` |
-| Update todo | PATCH | `/v1/todos/:id` |
-| Delete todo | DELETE | `/v1/todos/:id` |
-| List documents | GET | `/v1/projects/:slug/documents` |
-| Upload document | POST | `/v1/projects/:slug/documents` |
-| Delete document | DELETE | `/v1/documents/:id` |
-| This skill guide | GET | `/agent-skill` |
+| Component | URL / Command |
+|-----------|--------------|
+| Web UI | http://localhost:6171 |
+| REST API base | http://localhost:3000/v1 |
+| CLI entry | `node code/cli/bin/devflow.js` (or `devflow` if installed globally) |
+| This skill guide | http://localhost:3000/agent-skill |
+| CLI skill guide | http://localhost:3000/cli-skill |
+
+**No authentication is required** in the current deployment (internal/dev use).
 
 ---
 
@@ -30,18 +27,17 @@ DevFlow is a developer-centric project management tool. AI agents can manage pro
 ```json
 {
   "id": "uuid",
-  "slug": "my-project",
-  "name": "My Project",
-  "description": "Optional description",
+  "slug": "api-gateway-v2",
+  "name": "API Gateway v2",
+  "description": "Next-gen gateway",
   "color": "#534AB7",
   "defaultView": "overview",
   "archived": false,
-  "createdAt": "2026-06-03T00:00:00.000Z",
-  "updatedAt": "2026-06-03T00:00:00.000Z"
+  "createdAt": "2026-06-03T00:00:00.000Z"
 }
 ```
 
-### Todo
+### Todo (Task)
 ```json
 {
   "id": "uuid",
@@ -52,220 +48,226 @@ DevFlow is a developer-centric project management tool. AI agents can manage pro
   "priority": "p1",
   "status": "in_progress",
   "dueDate": "2026-06-10T00:00:00.000Z",
-  "remarks": "Blocked on Redis setup",
+  "remarks": "Blocked on Redis",
   "createdBy": "agent",
-  "createdAt": "2026-06-03T00:00:00.000Z",
-  "updatedAt": "2026-06-03T00:00:00.000Z"
+  "createdAt": "2026-06-03T00:00:00.000Z"
 }
 ```
 
 **Enums:**
-- `priority`: `p1` (High), `p2` (Medium), `p3` (Low)
-- `status`: `todo`, `in_progress`, `done`, `blocked`
-- `category`: any string — e.g. `Backend`, `Frontend`, `DevX`, `Design`, `Ops`
+- `priority`: `p1` (High) · `p2` (Medium) · `p3` (Low)
+- `status`: `todo` · `in_progress` · `done` · `blocked`
 
 ### Document
 ```json
 {
   "id": "uuid",
-  "projectId": "uuid",
   "name": "Tech Spec",
   "filename": "tech-spec.pdf",
   "mimeType": "application/pdf",
   "sizeBytes": 204800,
   "storageKey": "1717400000000-abc123.pdf",
-  "uploadedBy": "agent",
   "createdAt": "2026-06-03T00:00:00.000Z"
 }
 ```
 
 ---
 
-## Projects API
+## REST API Reference
 
-### List all active projects
-```http
-GET /v1/projects
+Base URL: `http://localhost:3000/v1`
+
+All request/response bodies are JSON. File upload uses `multipart/form-data`.
+
+### Projects
+
+```
+GET    /v1/projects               → Project[]     List active projects
+POST   /v1/projects               → Project       Create project
+DELETE /v1/projects/:slug         → {success}     Delete project + all data
 ```
 
-Response: array of Project objects (includes `_count.todos` and `_count.documents`).
+**Create project body:**
+```json
+{ "name": "Payment Service v2", "description": "...", "color": "#1D9E75", "defaultView": "overview" }
+```
 
-### Create a project
-```http
-POST /v1/projects
-Content-Type: application/json
+### Todos
 
+```
+GET    /v1/projects/:slug/todos   → Todo[]    List todos (newest first)
+POST   /v1/projects/:slug/todos   → Todo      Create todo
+PATCH  /v1/todos/:id              → Todo      Partial update
+DELETE /v1/todos/:id              → {success} Delete todo
+```
+
+**Create todo body:**
+```json
 {
-  "name": "Payment Service v2",
-  "description": "Stripe integration rewrite",
-  "color": "#1D9E75",
-  "defaultView": "overview"
-}
-```
-
-> `slug` is auto-generated from `name` by lowercasing and replacing spaces with `-`.
-
-### Delete a project
-```http
-DELETE /v1/projects/:slug
-```
-
-Cascades: removes all todos, documents (database + files on disk).
-
----
-
-## Todos API
-
-### List todos for a project
-```http
-GET /v1/projects/:slug/todos
-```
-
-Returns todos ordered by `createdAt` desc.
-
-### Create a todo
-```http
-POST /v1/projects/:slug/todos
-Content-Type: application/json
-
-{
-  "title": "Implement rate limiting middleware",
-  "content": "Use token bucket algo, configurable per route",
-  "category": "Backend",
-  "priority": "p1",
-  "status": "in_progress",
-  "dueDate": "2026-06-10",
-  "remarks": "Blocked on Redis setup",
+  "title": "Write OpenAPI spec",
+  "content": "Cover all v2 endpoints with examples",
+  "category": "DevX",
+  "priority": "p2",
+  "status": "todo",
+  "dueDate": "2026-06-15",
+  "remarks": "Needs review from team",
   "createdBy": "agent"
 }
 ```
 
-> Set `createdBy: "agent"` to distinguish AI-created tasks from human ones.
-
-### Update a todo (partial update)
-```http
-PATCH /v1/todos/:id
-Content-Type: application/json
-
-{
-  "status": "done"
-}
-```
-
-Any subset of fields can be updated. Common use cases:
-- Update status: `{ "status": "in_progress" }`
-- Mark done: `{ "status": "done" }`
-- Update priority: `{ "priority": "p1" }`
-- Add remarks: `{ "remarks": "Blocked on external API" }`
-
-### Delete a todo
-```http
-DELETE /v1/todos/:id
-```
-
----
-
-## Documents API
-
-### List documents for a project
-```http
-GET /v1/projects/:slug/documents
-```
-
-### Upload a document
-```http
-POST /v1/projects/:slug/documents
-Content-Type: multipart/form-data
-
-file=@./tech-spec.pdf
-```
-
-Using curl:
-```bash
-curl -X POST http://localhost:3000/v1/projects/my-project/documents \
-  -F "file=@./tech-spec.pdf"
-```
-
-Max file size: 50 MB. Any file type is accepted.
-
-### Download a document
-```http
-GET /uploads/:storageKey
-```
-
-The `storageKey` field is returned in the document object. Use it to construct the download URL:
-```
-http://localhost:3000/uploads/{storageKey}
-```
-
-### Delete a document
-```http
-DELETE /v1/documents/:id
-```
-
----
-
-## Error Responses
-
-All errors return:
+**Update todo — send only changed fields:**
 ```json
-{ "error": "Human-readable error message" }
+{ "status": "done" }
+{ "priority": "p1", "remarks": "Now urgent" }
+{ "status": "blocked", "remarks": "Waiting on infra" }
 ```
 
-Common errors:
-- `404 { "error": "Project not found" }` — invalid slug
-- `404 { "error": "Todo not found" }` — invalid id
-- `400 { "error": "No file provided" }` — upload without file
+### Documents
+
+```
+GET    /v1/projects/:slug/documents   → Doc[]     List documents
+POST   /v1/projects/:slug/documents   → Doc       Upload (multipart/form-data, field: "file")
+DELETE /v1/documents/:id              → {success} Delete document + file on disk
+GET    /uploads/:storageKey           → binary    Download file
+```
+
+### Error format
+
+All errors return: `{ "error": "Human-readable message" }` with appropriate HTTP status.
 
 ---
 
-## Common Agent Workflows
+## CLI Reference
 
-### 1. Triage and update task statuses
+**Install / run:**
 ```bash
-# Get all todos for a project
-GET /v1/projects/my-project/todos
+cd code/cli && npm install
+node bin/devflow.js --help
 
-# Update stale tasks
-PATCH /v1/todos/{id}
-{ "status": "blocked", "remarks": "Waiting on design review" }
+# Or set DEVFLOW_URL to target a different server
+DEVFLOW_URL=http://prod-server:3000/v1 node bin/devflow.js projects list
 ```
 
-### 2. Create tasks from a spec document
+### Projects CLI
+
 ```bash
-# First, create the project
-POST /v1/projects
-{ "name": "New Feature", "color": "#534AB7" }
+# List all projects
+devflow projects list
 
-# Then bulk-create todos
-POST /v1/projects/new-feature/todos
-{ "title": "Write API spec", "priority": "p1", "createdBy": "agent" }
+# Create a project
+devflow projects create "My Project" --color "#534AB7" --description "What we're building"
 
-POST /v1/projects/new-feature/todos
-{ "title": "Implement endpoints", "priority": "p2", "createdBy": "agent" }
+# Delete a project (with all tasks and documents)
+devflow projects delete my-project --yes          # --yes skips confirmation
 ```
 
-### 3. Upload a generated document
+### Todos CLI
+
 ```bash
-# Write spec to file, then upload
+# List tasks for a project
+devflow todos list my-project
+devflow todos list my-project --status in_progress
+devflow todos list my-project --priority p1
+
+# Create a task
+devflow todos create my-project "Task title" \
+  --priority p1 \
+  --category Backend \
+  --content "Acceptance criteria here" \
+  --status todo \
+  --due 2026-06-15 \
+  --agent                    # marks createdBy=agent
+
+# Update a task (use full UUID or 8-char prefix + --project)
+devflow todos update <id> --project my-project --status in_progress
+devflow todos update <id> --project my-project --priority p1 --remarks "Now urgent"
+
+# Mark done (shortcut)
+devflow todos done <id> --project my-project
+
+# Delete a task
+devflow todos delete <id> --project my-project --yes
+```
+
+### Documents CLI
+
+```bash
+# List documents
+devflow docs list my-project
+
+# Upload a file
+devflow docs upload my-project ./spec.pdf
+devflow docs upload my-project ./architecture.png
+
+# Delete a document
+devflow docs delete <id> --yes
+```
+
+---
+
+## Agent Workflows
+
+### 1. Understand a project's current state
+```bash
+# Via CLI
+devflow projects list
+devflow todos list my-project
+
+# Via REST API
+curl http://localhost:3000/v1/projects
+curl http://localhost:3000/v1/projects/my-project/todos
+```
+
+### 2. Create tasks from a spec (bulk)
+```bash
+# CLI — create multiple tasks
+devflow todos create api-gw-v2 "Implement rate limiting" --priority p1 --category Backend --agent
+devflow todos create api-gw-v2 "Write OpenAPI 3.0 spec" --priority p2 --category DevX --agent
+devflow todos create api-gw-v2 "SDK generation — Python & TS" --priority p2 --category DevX --agent
+
+# REST API — same as POST /v1/projects/api-gw-v2/todos for each task
+```
+
+### 3. Triage and update task statuses
+```bash
+# List in-progress tasks
+devflow todos list my-project --status in_progress
+
+# Mark completed
+devflow todos done <id> --project my-project
+
+# Flag a blocker
+devflow todos update <id> --project my-project \
+  --status blocked \
+  --remarks "Waiting on third-party API access"
+```
+
+### 4. Upload generated documents
+```bash
+# Generate a doc, then upload
+devflow docs upload my-project ./generated-spec.md
+devflow docs upload my-project ./architecture-diagram.png
+
+# REST API
 curl -X POST http://localhost:3000/v1/projects/my-project/documents \
   -F "file=@./generated-spec.md"
 ```
 
-### 4. Get project overview
+### 5. Create a new project and populate it
 ```bash
-# Projects with todo/doc counts
-GET /v1/projects
-
-# Detailed view with all todos
-GET /v1/projects/:slug
+devflow projects create "Sprint 42" --color "#1D9E75"
+devflow todos create sprint-42 "Design API contract" --priority p1 --agent
+devflow todos create sprint-42 "Implement endpoints" --priority p1 --agent
+devflow todos create sprint-42 "Write integration tests" --priority p2 --agent
+devflow todos create sprint-42 "Update docs" --priority p3 --agent
 ```
 
 ---
 
-## Notes for AI Agents
+## Key Conventions
 
-- **Identify yourself**: use `createdBy: "agent"` or your agent name when creating todos
-- **Slugs are stable**: use project slugs (not IDs) in paths — slugs are human-readable and don't change
-- **Partial PATCH**: only send the fields you want to update — the rest are preserved
-- **No authentication required** in the current deployment (internal/dev use)
+- **Identify agent work**: always set `createdBy: "agent"` (CLI: `--agent` flag) so tasks can be filtered from human-created ones
+- **Slugs are stable**: use the project `slug` (not `id`) in paths — slugs are human-readable and don't change after creation
+- **Short IDs**: the CLI list shows 8-char short IDs; use them with `--project <slug>` for update/done/delete, or pass the full UUID
+- **Partial PATCH**: only send fields you want to change — all others are preserved
+- **Slug generation**: when creating a project, `slug` is auto-generated as `name.toLowerCase().replace(/ /g, "-")`
