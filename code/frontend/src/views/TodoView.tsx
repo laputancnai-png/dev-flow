@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ArrowUp, ArrowDown, Minus, Filter, ArrowUpDown, Terminal, X, Trash2 } from "lucide-react";
+import { Check, ArrowUp, ArrowDown, Minus, Filter, ChevronUp, ChevronDown, ChevronsUpDown, Terminal, X, Trash2 } from "lucide-react";
 import type { Todo } from "../types";
 import { api } from "../api";
 
@@ -11,6 +11,8 @@ interface Props {
 }
 
 type FilterStatus = "all" | "in_progress" | "todo" | "blocked" | "done";
+type SortField = "category" | "priority" | "status" | "date";
+type SortDir = "asc" | "desc";
 
 const PRIORITY_COLOR: Record<string, string> = { p1: "pri-high", p2: "pri-med", p3: "pri-low" };
 const STATUS_CLASS: Record<string, string> = {
@@ -198,18 +200,67 @@ function TodoEditModal({ todo, onClose, onSaved, onDeleted }: {
   );
 }
 
+const PRIORITY_ORDER: Record<string, number> = { p1: 0, p2: 1, p3: 2 };
+const STATUS_ORDER: Record<string, number> = { in_progress: 0, todo: 1, blocked: 2, done: 3 };
+
+function SortHeader({ field, label, sortField, sortDir, onSort }: {
+  field: SortField; label: string;
+  sortField: SortField | null; sortDir: SortDir;
+  onSort: (f: SortField) => void;
+}) {
+  const active = sortField === field;
+  return (
+    <div
+      className={`th-sortable ${active ? "active" : ""}`}
+      onClick={() => onSort(field)}
+      title={`Sort by ${label}`}
+    >
+      {label}
+      <span className="th-sort-icon">
+        {active
+          ? (sortDir === "asc" ? <ChevronUp size={11} /> : <ChevronDown size={11} />)
+          : <ChevronsUpDown size={11} />}
+      </span>
+    </div>
+  );
+}
+
 // ── Main component ──────────────────────────────────────────────────────────
 export default function TodoView({ todos, loading, onToggleTodo, onTodosChange }: Props) {
   const [filter, setFilter] = useState<FilterStatus>("all");
-  const [sortByPriority, setSortByPriority] = useState(false);
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
 
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir(d => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  };
+
   let displayed = filter === "all" ? todos : todos.filter(t => t.status === filter);
-  if (sortByPriority) {
-    const order = { p1: 0, p2: 1, p3: 2 };
-    displayed = [...displayed].sort(
-      (a, b) => (order[a.priority as keyof typeof order] ?? 2) - (order[b.priority as keyof typeof order] ?? 2)
-    );
+  if (sortField) {
+    const dir = sortDir === "asc" ? 1 : -1;
+    displayed = [...displayed].sort((a, b) => {
+      if (sortField === "category") {
+        return dir * (a.category ?? "").localeCompare(b.category ?? "");
+      }
+      if (sortField === "priority") {
+        return dir * ((PRIORITY_ORDER[a.priority] ?? 2) - (PRIORITY_ORDER[b.priority] ?? 2));
+      }
+      if (sortField === "status") {
+        return dir * ((STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99));
+      }
+      if (sortField === "date") {
+        const da = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+        const db = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+        return dir * (da - db);
+      }
+      return 0;
+    });
   }
 
   const handleSaved = (_updated: Todo) => {
@@ -236,12 +287,6 @@ export default function TodoView({ todos, loading, onToggleTodo, onTodosChange }
           <span className="filter-chip">
             <Filter size={12} /> Filter
           </span>
-          <span
-            className={`filter-chip ${sortByPriority ? "active" : ""}`}
-            onClick={() => setSortByPriority(v => !v)}
-          >
-            <ArrowUpDown size={12} /> Sort
-          </span>
         </div>
       </div>
 
@@ -249,10 +294,10 @@ export default function TodoView({ todos, loading, onToggleTodo, onTodosChange }
         <div className="todo-table-header">
           <div />
           <div>Title</div>
-          <div>Category</div>
-          <div>Priority</div>
-          <div>Status</div>
-          <div>Date</div>
+          <SortHeader field="category" label="Category" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+          <SortHeader field="priority" label="Priority" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+          <SortHeader field="status"   label="Status"   sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+          <SortHeader field="date"     label="Date"     sortField={sortField} sortDir={sortDir} onSort={handleSort} />
         </div>
 
         {loading && <div className="empty-state">Loading...</div>}
